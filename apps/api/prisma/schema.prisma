@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  VOLUNTEER
+  ADMIN
+}
+
+enum DonationStatus {
+  PENDING
+  ACCEPTED
+  ASSIGNED_TO_VOLUNTEER
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum AssistanceRequestStatus {
+  PENDING
+  REVIEWING
+  APPROVED
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
+
+enum DonationClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+enum VolunteerTaskStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  CANCELLED
+}
+
+enum UrgencyLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model User {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  phone     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  // Relations
+  donations          Donation[]
+  assistanceRequests AssistanceRequest[]
+  donationClaims     DonationClaim[]
+  volunteerTasks     VolunteerTask[]     @relation("VolunteerTasks")
+  notifications      Notification[]
+  activityLogs       ActivityLog[]
+}
+
+model Donation {
+  id            String         @id @default(uuid())
+  title         String
+  description   String
+  category      String
+  quantity      Int            @default(1)
+  monetaryValue Decimal?       @db.Decimal(10, 2)
+  status        DonationStatus @default(PENDING)
+  donorId       String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  isDeleted     Boolean        @default(false)
+
+  // Relations
+  donor  User            @relation(fields: [donorId], references: [id])
+  claims DonationClaim[]
+
+  @@index([donorId])
+  @@index([status])
+}
+
+model AssistanceRequest {
+  id          String                  @id @default(uuid())
+  title       String
+  description String
+  urgency     UrgencyLevel            @default(MEDIUM)
+  location    String
+  status      AssistanceRequestStatus @default(PENDING)
+  requesterId String
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  isDeleted   Boolean                 @default(false)
+
+  // Relations
+  requester User            @relation(fields: [requesterId], references: [id])
+  tasks     VolunteerTask[]
+
+  @@index([requesterId])
+  @@index([status])
+}
+
+model DonationClaim {
+  id         String              @id @default(uuid())
+  donationId String
+  claimerId  String
+  status     DonationClaimStatus @default(PENDING)
+  quantity     Int                 @default(1)
+  reason       String?
+  contactName  String?
+  contactPhone String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  // Relations
+  donation Donation @relation(fields: [donationId], references: [id])
+  claimer  User     @relation(fields: [claimerId], references: [id])
+
+  @@index([donationId])
+  @@index([claimerId])
+}
+
+model VolunteerTask {
+  id                  String              @id @default(uuid())
+  volunteerId         String
+  assistanceRequestId String?
+  description         String
+  status              VolunteerTaskStatus @default(PENDING)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Relations
+  volunteer         User               @relation("VolunteerTasks", fields: [volunteerId], references: [id])
+  assistanceRequest AssistanceRequest? @relation(fields: [assistanceRequestId], references: [id])
+
+  @@index([volunteerId])
+  @@index([assistanceRequestId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  entityId   String?
+  entityType String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+}
